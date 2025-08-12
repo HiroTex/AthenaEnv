@@ -34,9 +34,9 @@ EE_EXT = .elf
 EE_BIN_PREF ?= athena
 EE_BIN_PKD = $(EE_BIN_PREF)_pkd
 
-UDPBD ?= 0
-ILINK ?= 0
-MX4SIO ?= 0
+UDPBD ?= 1
+ILINK ?= 1
+MX4SIO ?= 1
 
 DEBUG ?= 0
 EE_SIO ?= 0
