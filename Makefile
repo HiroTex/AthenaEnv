@@ -43,6 +43,7 @@ EE_SIO ?= 0
 
 PADEMU ?= 1
 GRAPHICS ?= 1
+ODE_PHYSICS_COLLISION ?= 1
 AUDIO ?= 1
 
 # Module linking control
@@ -79,11 +80,11 @@ VU1_MPGS = draw_3D_colors.o \
 
 # VU0_MPGS = matrix_multiply.o
 
-APP_CORE = main.o bootlogo.o texture_manager.o owl_packet.o vif.o athena_math.o memory.o ee_tools.o module_system.o iop_manager.o taskman.o pad.o system.o strUtils.o mpg_manager.o matrix.o vector.o excepHandler.o exceptions.o 
+APP_CORE = main.o bootlogo.o texture_manager.o owl_packet.o vif.o athena_math.o memory.o ee_tools.o module_system.o iop_manager.o taskman.o lockman.o pad.o system.o strUtils.o mpg_manager.o matrix.o vector.o excepHandler.o exceptions.o 
 
 INI_READER = readini/src/readini.o
 
-ATHENA_MODULES = ath_env.o ath_physics.o ath_vector.o ath_vector4.o ath_matrix.o ath_pads.o ath_system.o ath_iop.o ath_archive.o ath_timer.o ath_task.o
+ATHENA_MODULES = ath_env.o ath_vector.o ath_vector4.o ath_matrix.o ath_pads.o ath_system.o ath_iop.o ath_archive.o ath_timer.o ath_task.o ath_mutex.o
 
 IOP_MODULES = iomanx.o filexio.o sio2man.o mcman.o mcserv.o padman.o  \
 			  usbd.o bdm.o bdmfs_fatfs.o usbmass_bd.o cdfs.o \
@@ -109,6 +110,16 @@ ifeq ($(MX4SIO),1)
   IOP_MODULES += mx4sio_bd.o
 endif
 
+ifeq ($(ODE_PHYSICS_COLLISION),1)
+  EE_LIBS += -Lee_modules/ode/lib/ -lopcode -lice -lode
+  EE_INCS += -Iee_modules/ode/include
+  EE_CFLAGS += -DATHENA_ODE
+
+  ATHENA_MODULES += ath_ode.o
+
+  EXT_LIBS += ee_modules/ode/lib/libice.a ee_modules/ode/lib/libopcode.a ee_modules/ode/lib/libode.a
+endif
+
 ifeq ($(GRAPHICS),1)
   EE_LIBS += -L$(PS2DEV)/gsKit/lib/ -ljpeg -lfreetype -ldmakit -lpng
   EE_INCS += -I$(PS2DEV)/gsKit/include -I$(PS2SDK)/ports/include/freetype2
@@ -124,7 +135,7 @@ ifeq ($(PADEMU),1)
   EE_INCS += -Iiop_modules/ds34bt/ee -Iiop_modules/ds34usb/ee
   EE_LIBS += -Liop_modules/ds34bt/ee/ -Liop_modules/ds34usb/ee/ -lds34bt -lds34usb
   IOP_MODULES += ds34usb.o ds34bt.o
-	EXT_LIBS = iop_modules/ds34usb/ee/libds34usb.a iop_modules/ds34bt/ee/libds34bt.a
+	EXT_LIBS += iop_modules/ds34usb/ee/libds34usb.a iop_modules/ds34bt/ee/libds34bt.a
 endif
 
 ifeq ($(AUDIO),1)
@@ -200,9 +211,9 @@ all: $(DIR_GUARD) $(EXT_LIBS) $(EE_OBJS)
 	$(MAKE) -f Makefile.dl KEYBOARD=$(DYNAMIC_KEYBOARD)
 	$(MAKE) -f Makefile.dl MOUSE=$(DYNAMIC_MOUSE)
 
-	$(EE_CC) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o $(EE_BIN_DIR)tmp.elf $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) $(EE_LIBS) $(EE_SRC_DIR)dummy-exports.c
+	$(EE_CXX) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o $(EE_BIN_DIR)tmp.elf $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) -Wno-write-strings $(EE_LIBS) $(EE_SRC_DIR)dummy-exports.c
 	./build-exports.sh
-	$(EE_CC) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o $(EE_BIN) $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) $(EE_LIBS) $(EE_SRC_DIR)exports.c
+	$(EE_CXX) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o $(EE_BIN) $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) -fpermissive -Wno-write-strings $(EE_LIBS) $(EE_SRC_DIR)exports.c
 	rm $(EE_BIN_DIR)tmp.elf
 	@echo "$$HEADER"
 	
@@ -218,9 +229,9 @@ debug: $(DIR_GUARD) $(EXT_LIBS) $(EE_OBJS)
 	$(MAKE) -f Makefile.dl KEYBOARD=$(DYNAMIC_KEYBOARD)
 	$(MAKE) -f Makefile.dl MOUSE=$(DYNAMIC_MOUSE)
 
-	$(EE_CC) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o $(EE_BIN_DIR)tmp.elf $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) $(EE_LIBS) $(EE_SRC_DIR)dummy-exports.c
+	$(EE_CXX) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o $(EE_BIN_DIR)tmp.elf $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) -Wno-write-strings $(EE_LIBS) $(EE_SRC_DIR)dummy-exports.c
 	./build-exports.sh
-	$(EE_CC) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o bin/athena_debug.elf $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) $(EE_LIBS) $(EE_SRC_DIR)exports.c
+	$(EE_CXX) -T$(EE_LINKFILE) $(EE_OPTFLAGS) -o bin/athena_debug.elf $(EE_OBJS) $(EE_LDFLAGS) $(EXTRA_LDFLAGS) -fpermissive -Wno-write-strings $(EE_LIBS) $(EE_SRC_DIR)exports.c
 	rm $(EE_BIN_DIR)tmp.elf
 
 	echo "Building bin/athena_debug.elf with debug symbols..."
@@ -233,6 +244,7 @@ clean:
 	$(MAKE) -C iop_modules/ds34usb clean
 	$(MAKE) -C iop_modules/ds34bt clean
 	$(MAKE) -C ee_modules/loader clean
+	$(MAKE) -C ee_modules/ode clean
 
 	$(MAKE) -f Makefile.dl KEYBOARD=$(DYNAMIC_KEYBOARD) clean
 	$(MAKE) -f Makefile.dl MOUSE=$(DYNAMIC_MOUSE) clean

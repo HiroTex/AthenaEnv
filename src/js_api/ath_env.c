@@ -181,6 +181,11 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 
 				#endif
 
+				#ifdef ATHENA_ODE
+				"import * as ODE from 'ODE';\n"
+				"globalThis.ODE = ODE;\n"
+				#endif
+
 				"import * as std from 'std';\n"
                 "import * as os from 'os';\n"
 				"import * as Timer from 'Timer';\n"
@@ -193,7 +198,6 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 				"import * as Vector3 from 'Vector3';\n"
 				"import * as Vector4 from 'Vector4';\n"
 				"import * as Matrix4 from 'Matrix4';\n"
-				"import * as Physics from 'Physics';\n"
 
                 "globalThis.std = std;\n"
                 "globalThis.os = os;\n"
@@ -207,7 +211,9 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 				"globalThis.Vector3 = Vector3.Vector3;\n"
 				"globalThis.Vector4 = Vector4.Vector4;\n"
 				"globalThis.Matrix4 = Matrix4.Matrix4;\n"
-				"globalThis.Physics = Physics;\n";
+
+				"import Mutex from 'Mutex';\n"
+				"globalThis.Mutex = Mutex;\n";
 
 				
             rc = qjs_eval_buf(ctx, str, strlen(str), "<input>", JS_EVAL_TYPE_MODULE);
@@ -257,11 +263,11 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
 	athena_archive_init(ctx);
 	athena_timer_init(ctx);
 	athena_task_init(ctx);
+	athena_mutex_init(ctx);
 	athena_pads_init(ctx);
 	athena_vector_init(ctx);
 	athena_vector4_init(ctx);
 	athena_matrix_init(ctx);
-	athena_physics_init(ctx);
 
 	#ifdef ATHENA_AUDIO
 	athena_sound_init(ctx);
@@ -278,6 +284,11 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
 	athena_lights_init(ctx);
 	athena_3dcamera_init(ctx);
 	athena_anim_3d_init(ctx);
+	
+	#endif
+
+	#ifdef ATHENA_ODE
+	athena_ode_init(ctx);
 	#endif
 
 	#ifdef ATHENA_KEYBOARD
