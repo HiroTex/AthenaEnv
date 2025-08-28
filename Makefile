@@ -43,7 +43,7 @@ EE_SIO ?= 0
 
 PADEMU ?= 1
 GRAPHICS ?= 1
-ODE_PHYSICS_COLLISION ?= 1
+ODE_PHYSICS_COLLISION ?= 0
 AUDIO ?= 1
 
 # Module linking control
