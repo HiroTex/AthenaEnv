@@ -5,13 +5,20 @@ Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);
 const timerMutex = new Mutex();
 
 let counter = 0;
+let pulse_counter = 0;
 
 const timer = Timer.new();
 let time = 0;
 
 let counting = true;
 
-const thread = Threads.new(() => {
+const pulse_thread = new Thread(() => {
+    if (counting) {
+        pulse_counter++;
+    }
+}, "Thread: Pulse counter");
+
+const thread = new Thread(() => {
     while (true) {
         timerMutex.lock();
 
@@ -23,11 +30,15 @@ const thread = Threads.new(() => {
             }
         }
 
-        timerMutex.unlock();
+        //timerMutex.unlock();
     }
-});
+}, "Thread: Loop counter");
 
-//throw SyntaxError("receba");
+timerMutex.lock();
+
+thread.start();
+
+//throw SyntaxError("receba"); // throw de teste
 
 const font = new Font("default");
 
@@ -35,16 +46,25 @@ const pad = Pads.get();
 
 pad.setEventHandler();
 
+globalThis.activeObjects = [thread, pulse_thread]; // keep it in memory, since the code execution will be asynchronous and independent from GC
+
 Pads.newEvent(Pads.CROSS, Pads.JUST_PRESSED, () => { 
     counting ^= 1;
 });
 
-thread.start();
+Pads.newEvent(Pads.TRIANGLE, Pads.JUST_PRESSED, () => { 
+    globalThis.activeObjects = null;
+});
+
+os.setInterval(() => {
+    pulse_thread.start();
+}, 1000);
+
+console.log(JSON.stringify(Thread.list()));
 
 Screen.display(() => {
-    timerMutex.lock();
-
     font.print(0, 0, `Hello from main thread! Counter from aux thread: ${counter}`);
+    font.print(0, 100, `Pulse counter: ${pulse_counter}`);
 
     timerMutex.unlock();
 });
