@@ -7,6 +7,7 @@
 #include <graphics.h>
 #include <fntsys.h>
 #include <ath_env.h>
+#include <owl_packet.h>
 
 static JSValue athena_set_clear_color(JSContext *ctx, JSValue this_val, int argc, JSValueConst *argv){
 	static Color clear_color = GS_SETREG_RGBAQ(0x00, 0x00, 0x00, 0x80, 0x00);
@@ -128,6 +129,17 @@ static JSValue athena_setvmode(JSContext *ctx, JSValue this_val, int argc, JSVal
 
 	setVideoMode(mode, width, height, psm, interlace, field, zbuffering, psmz, double_buffering, pass_count);
 	return JS_UNDEFINED;
+}
+
+static JSValue athena_alpha_equation(JSContext *ctx, JSValue this_val, int argc, JSValueConst *argv){
+	int a, b, c, d, fix;
+	JS_ToInt32(ctx, &a,   argv[0]);
+	JS_ToInt32(ctx, &b,   argv[1]);
+	JS_ToInt32(ctx, &c,   argv[2]);
+	JS_ToInt32(ctx, &d,   argv[3]);
+	JS_ToInt32(ctx, &fix, argv[4]);
+
+	return JS_NewInt64(ctx, ALPHA_EQUATION(a, b, c, d, fix));
 }
 
 static JSValue athena_set_param(JSContext *ctx, JSValue this_val, int argc, JSValueConst *argv){
@@ -329,6 +341,11 @@ static JSValue athena_switch_context(JSContext *ctx, JSValue this_val, int argc,
 	return JS_NewInt32(ctx, screen_switch_context());
 }
 
+static JSValue athena_flush(JSContext *ctx, JSValue this_val, int argc, JSValueConst *argv){
+	owl_flush_packet();
+	return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry module_funcs[] = {
     JS_CFUNC_DEF("flip", 0, athena_flip),
     JS_CFUNC_DEF("clear", 1, athena_clear),
@@ -351,6 +368,8 @@ static const JSCFunctionListEntry module_funcs[] = {
 
 	JS_CFUNC_DEF("getParam", 1, athena_get_param),
 	JS_CFUNC_DEF("setParam", 2, athena_set_param),
+
+	JS_CFUNC_DEF("alphaEquation", 1, athena_alpha_equation),
 
 	JS_PROP_INT32_DEF("ALPHA_TEST_ENABLE", ALPHA_TEST_ENABLE, JS_PROP_CONFIGURABLE),
 	JS_PROP_INT32_DEF("ALPHA_TEST_METHOD", ALPHA_TEST_METHOD, JS_PROP_CONFIGURABLE),
@@ -434,6 +453,7 @@ static const JSCFunctionListEntry module_funcs[] = {
 	JS_PROP_INT32_DEF("DEPTH_BUFFER", DEPTH_BUFFER, JS_PROP_CONFIGURABLE),
 
 	JS_CFUNC_DEF("switchContext", 0, athena_switch_context),
+	JS_CFUNC_DEF("flush", 0, athena_flush),
 };
 
 static int screen_init(JSContext *ctx, JSModuleDef *m)

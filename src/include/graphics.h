@@ -87,6 +87,8 @@ struct gsSurface
 	uint8_t ClutStorageMode;	///< CLUT Storage Mode
 	uint8_t	Delayed;	///< Delay Texture Upload To VRAM
 	uint8_t PageAligned;
+	uint8_t Macroblock;	///< Data is in 16x16 macroblock format (for MPEG)
+	uint32_t Mask;      ///< Framebuffer Mask
 };
 typedef struct gsSurface GSSURFACE;
 
@@ -283,7 +285,8 @@ extern GSSURFACE *main_screen_buffer[3];
 typedef enum {
     FONT_TYPE_FNT,
     FONT_TYPE_BMP_DAT,
-    FONT_TYPE_PNG_DAT
+    FONT_TYPE_PNG_DAT,
+    FONT_TYPE_JPEG_DAT
 } eTextureFontTypes;
 
 /// gsKit Font Structure
@@ -512,6 +515,10 @@ void draw_quad_gouraud(float x, float y, float x2, float y2, float x3, float y3,
 
 GSFONT* loadFont(const char* path);
 void printFontText(GSFONT* font, const char* text, float x, float y, float scale, Color color);
+void printFontTextPlus(GSFONT* font, const char* text, float x, float y, float scale, Color color,
+                       short aligned, size_t width, size_t height,
+                       float outline, Color outline_color,
+                       float dropshadow, Color dropshadow_color);
 void unloadFont(GSFONT* font);
 
 void athena_error_screen(const char* errMsg, bool dark_mode);

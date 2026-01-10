@@ -146,6 +146,7 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 				#endif
 
 				#ifdef ATHENA_GRAPHICS
+				"import * as Shadows from 'Shadows';\n"
 				"import * as Color from 'Color';\n"
 				"import * as Screen from 'Screen';\n"
 				"import * as Draw from 'Draw';\n"
@@ -155,6 +156,9 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 				"import * as Render from 'Render';\n"
 				"import * as RenderData from 'RenderData';\n"
 				"import * as RenderObject from 'RenderObject';\n"
+				"import * as RenderBatch from 'RenderBatch';\n"
+				"import * as RenderSceneNode from 'RenderSceneNode';\n"
+				"import * as RenderAsyncLoader from 'RenderAsyncLoader';\n"
 				"import * as AnimCollection from 'AnimCollection';\n"
 				"import * as Lights from 'Lights';\n"
 				"import * as Camera from 'Camera';\n"
@@ -172,13 +176,25 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 				"globalThis.Render = Render;\n"
 				"globalThis.RenderData = RenderData.RenderData;\n"
 				"globalThis.RenderObject = RenderObject.RenderObject;\n"
+				"globalThis.Batch = RenderBatch.Batch;\n"
+				"globalThis.SceneNode = RenderSceneNode.SceneNode;\n"
+				"globalThis.AsyncLoader = RenderAsyncLoader.AsyncLoader;\n"
 
 				"globalThis.AnimCollection = AnimCollection.AnimCollection;\n"
 
 				"globalThis.Lights = Lights;\n"
 
 				"globalThis.Camera = Camera;\n"
+				"globalThis.Shadows = Shadows;\n"
 
+				"import TileMap from 'TileMap';\n"
+				"globalThis.TileMap = TileMap;\n"
+
+				#endif
+
+				#ifdef ATHENA_MPEG_VIDEO
+				"import * as Video from 'Video';\n"
+				"globalThis.Video = Video.Video;\n"
 				#endif
 
 				#ifdef ATHENA_ODE
@@ -214,7 +230,13 @@ static int qjs_handle_fh(JSContext *ctx, FILE *f, const char *filename, const ch
 				"globalThis.Thread = Thread;\n"
 
 				"import Mutex from 'Mutex';\n"
-				"globalThis.Mutex = Mutex;\n";
+				"globalThis.Mutex = Mutex;\n"
+
+				#ifdef ATHENA_NATIVE_COMPILER
+				"import * as Native from 'Native';\n"
+				"globalThis.Native = Native;\n"
+				#endif
+				;
 
 				
             rc = qjs_eval_buf(ctx, str, strlen(str), "<input>", JS_EVAL_TYPE_MODULE);
@@ -270,6 +292,7 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
 	athena_vector4_init(ctx);
 	athena_matrix_init(ctx);
 
+
 	#ifdef ATHENA_AUDIO
 	athena_sound_init(ctx);
 	#endif
@@ -285,6 +308,8 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
 	athena_lights_init(ctx);
 	athena_3dcamera_init(ctx);
 	athena_anim_3d_init(ctx);
+	athena_shadows_init(ctx);
+	athena_tilemap_init(ctx);
 	
 	#endif
 
@@ -311,6 +336,14 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
 	athena_ws_init(ctx); 
 	#endif
 
+	#ifdef ATHENA_NATIVE_COMPILER
+	athena_native_init(ctx);
+	#endif
+
+	#ifdef ATHENA_MPEG_VIDEO
+	athena_mpeg_init(ctx);
+	#endif
+
     return ctx;
 }
 
@@ -320,6 +353,10 @@ void destroy_vm(JSContext* ctx) {
 	JSRuntime* rt = JS_GetRuntime(ctx);
 
 	athena_task_free(ctx);
+
+	#ifdef ATHENA_NATIVE_COMPILER
+	athena_native_cleanup();
+	#endif
 
 	js_std_free_handlers(rt);
 	JS_FreeContext(ctx);
@@ -354,6 +391,10 @@ const char* run_script(const char* script, bool isBuffer)
 
     int s = qjs_handle_file(ctx, script, NULL);
 
+	if (s >= 0) {
+		s = js_std_loop(ctx);
+	}
+
     if (s < 0) { 
 		if (s == JSFILE_NOTFOUND) {
 			sprintf(error_buf, "AthenaError: Fail when opening %s\n"
@@ -374,27 +415,9 @@ const char* run_script(const char* script, bool isBuffer)
 		destroy_vm(ctx);
 
 		return error_buf; 
-	} else {
-		s = js_std_loop(ctx);
-
-		if (s < 0) {
-			JSValue exception_val = JS_GetException(ctx);
-			const char* exception = JS_ToCString(ctx, exception_val);
-			JSValue stack_val = JS_GetPropertyStr(ctx, exception_val, "stack");
-			const char* stack = JS_ToCString(ctx, stack_val);
-			JS_FreeValue(ctx, exception_val);
-			JS_FreeValue(ctx, stack_val);
-
-			strcpy(error_buf, exception);
-			strcat(error_buf, "\n");
-			strcat(error_buf, stack);
-
-			destroy_vm(ctx);
-
-			return error_buf; 
-		}
 	}
 	
 	destroy_vm(ctx);
+
     return NULL;
 }

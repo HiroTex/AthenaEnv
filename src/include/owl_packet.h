@@ -130,11 +130,22 @@ inline void owl_add_uquad(owl_packet *packet, __uint128_t a1) {
 	packet->ptr++;
 }
 
-inline void owl_add_unpack_data(owl_packet *packet, uint32_t t_dest_address, void *t_data, uint32_t t_size, uint8_t t_use_top) {
-    owl_add_tag(packet, (VIF_CODE(0x0101 | (0 << 8), 0, VIF_STCYCL, 0) | (uint64_t)
-	                    VIF_CODE(t_dest_address | ((uint32_t)1 << 14) | ((uint32_t)t_use_top << 15), ((t_size == 256) ? 0 : t_size), UNPACK_V4_32 | ((uint32_t)0 << 4) | 0x60, 0) << 32 ),
-                        DMA_TAG(t_size, 0, DMA_REF, 0, t_data, 0)
-                );
+inline void owl_add_unpack_data_ref(owl_packet *packet, uint32_t t_dest_address, void *t_data, uint32_t t_size, uint8_t t_use_top) {
+    owl_add_ulong(packet, DMA_TAG(t_size, 0, DMA_REF, 0, t_data, 0));
+    owl_add_uint(packet, VIF_CODE(0x0101 | (0 << 8), 0, VIF_STCYCL, 0));
+    owl_add_uint(packet, VIF_CODE(t_dest_address | ((uint32_t)1 << 14) | ((uint32_t)t_use_top << 15), ((t_size == 256) ? 0 : t_size), UNPACK_V4_32 | ((uint32_t)0 << 4) | 0x60, 0));
+}
+
+inline void owl_add_unpack_data_cnt(owl_packet *packet, uint32_t t_dest_address, uint32_t t_size, uint8_t t_use_top) {
+    owl_add_ulong(packet, DMA_TAG(t_size, 0, DMA_CNT, 0, 0, 0));
+    owl_add_uint(packet, VIF_CODE(0x0101 | (0 << 8), 0, VIF_STCYCL, 0));
+    owl_add_uint(packet, VIF_CODE(t_dest_address | ((uint32_t)1 << 14) | ((uint32_t)t_use_top << 15), ((t_size == 256) ? 0 : t_size), UNPACK_V4_32 | ((uint32_t)0 << 4) | 0x60, 0));
+}
+
+inline void owl_add_unpack_data_auto(owl_packet *packet, uint32_t t_dest_address, void *t_data, uint32_t t_size, uint8_t t_use_top) {
+    owl_add_ulong(packet, DMA_TAG(t_size, 0, DMA_CNT, 0, 0, 0));
+    owl_add_uint(packet, VIF_CODE(0x0101 | (0 << 8), 0, VIF_STCYCL, 0));
+    owl_add_uint(packet, VIF_CODE(t_dest_address | ((uint32_t)1 << 14) | ((uint32_t)t_use_top << 15), ((t_size == 256) ? 0 : t_size), UNPACK_V4_32 | ((uint32_t)0 << 4) | 0x60, 0));
 }
 
 inline void owl_align_packet(owl_packet *packet) {
@@ -247,6 +258,8 @@ extern const uint16_t OWL_XYMAX[8] qw_aligned;
 
 extern const int16_t OWL_XYOFFSET_FIXED[8] qw_aligned;
 extern const uint16_t OWL_XYMAX_FIXED[8] qw_aligned;
+
+extern const float XYUV_MAX_FLOAT[4] qw_aligned;
 
 inline void owl_add_uv(owl_packet *packet, int u, int v) { // each call increases 8 bytes in pointer
 	asm volatile ( 	

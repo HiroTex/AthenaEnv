@@ -7,6 +7,13 @@
 //3D math
 
 typedef struct {
+	VECTOR position;
+	VECTOR target;
+	VECTOR up;
+	VECTOR local_up;
+} athena_camera_state;
+
+typedef struct {
 	float    x;
 	float    y;
 	float    z;
@@ -143,12 +150,6 @@ typedef struct vertex_skin_data {
 
 typedef struct
 {
-	owl_qword prim_tag;
-	owl_qword clip_tag;
-
-	owl_qword notm_prim_tag;
-	owl_qword notm_clip_tag;
-
     VECTOR ambient; 
     VECTOR diffuse;
     VECTOR specular;  
@@ -252,6 +253,8 @@ void LookAtCameraMatrix(MATRIX m, VECTOR position, VECTOR target, VECTOR up);
 
 void render_init();
 
+void render_begin();
+
 void render_set_view(float fov, float near, float far, float width, float height);
 
 VECTOR *getCameraPosition();
@@ -314,5 +317,15 @@ void create_transform_matrix(MATRIX result, const VECTOR position,
 
 void decompose_transform_matrix(const MATRIX matrix, VECTOR position, 
                               VECTOR rotation, VECTOR scale);
+
+void append_texture_tags(owl_packet* packet, GSSURFACE *texture, int texture_id, eColorFunctions func);
+
+typedef struct {
+	uint32_t draw_calls;
+	uint32_t triangles;
+} render_stats_t;
+
+const render_stats_t *render_get_stats(void);
+void render_reset_stats(void);
 
 #endif

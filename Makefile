@@ -76,7 +76,8 @@ VU1_MPGS = draw_3D_colors.o \
            draw_3D_colors_skin.o \
            draw_3D_lights_skin.o \
            draw_3D_spec_skin.o \
-           draw_3D_lights_ref.o 
+           draw_3D_lights_ref.o \
+           draw_2D_tile_list.o
 
 # VU0_MPGS = matrix_multiply.o
 
@@ -124,9 +125,10 @@ ifeq ($(GRAPHICS),1)
   EE_LIBS += -L$(PS2DEV)/gsKit/lib/ -ljpeg -lfreetype -ldmakit -lpng
   EE_INCS += -I$(PS2DEV)/gsKit/include -I$(PS2SDK)/ports/include/freetype2
   EE_CFLAGS += -DATHENA_GRAPHICS
-  APP_CORE += graphics.o image_font.o owl_draw.o image_loaders.o mesh_loaders.o atlas.o fntsys.o render.o camera.o skin_math.o calc_3d.o fast_obj/fast_obj.o
+  APP_CORE += tile_render.o graphics.o image_font.o owl_draw.o image_loaders.o mesh_loaders.o atlas.o fntsys.o render.o camera.o skin_math.o calc_3d.o fast_obj/fast_obj.o
 
-  ATHENA_MODULES += ath_color.o ath_font.o ath_render.o ath_anim_3d.o ath_lights.o ath_3dcamera.o ath_screen.o ath_image.o ath_imagelist.o ath_shape.o
+  ATHENA_MODULES += ath_color.o ath_font.o ath_render.o ath_anim_3d.o ath_lights.o ath_3dcamera.o ath_screen.o ath_image.o ath_imagelist.o ath_shape.o ath_shadows.o ath_sprite.o
+  APP_CORE += shadows.o render_batch.o render_scene.o render_async_loader.o
   EE_OBJS += $(VU1_MPGS) $(VU0_MPGS)
 endif
 
@@ -147,6 +149,16 @@ ifeq ($(AUDIO),1)
   EE_LIBS += -laudsrv -lvorbisfile -lvorbis -logg
 endif
 
+# MPEG Video support (requires PS2SDK libmpeg)
+MPEG_VIDEO ?= 1
+
+ifeq ($(MPEG_VIDEO),1)
+  EE_CFLAGS += -DATHENA_MPEG_VIDEO
+  APP_CORE += mpeg_player.o
+  ATHENA_MODULES += ath_mpeg.o
+  EE_LIBS += -lmpeg
+endif
+
 ifneq ($(EE_SIO), 0)
   EE_BIN_PREF := $(EE_BIN_PREF)_eesio
   EE_BIN_PKD := $(EE_BIN_PKD)_eesio
@@ -160,7 +172,19 @@ ifeq ($(STATIC_NETWORK),1)
   APP_CORE += network.o request.o
   ATHENA_MODULES += ath_network.o ath_socket.o ath_request.o ath_websocket.o
   IOP_MODULES += NETMAN.o SMAP.o ps2ips.o
-  EE_LIBS += -lnetman -lps2ip -lcurl -lwolfssl
+  # Native networking backend (lwIP + BearSSL)
+  EE_LIBS += -lnetman -lps2ip
+  APP_CORE += net/ath_http.o net/ath_tls.o net/ath_ws.o
+  # Optional TLS (BearSSL)
+  EE_CFLAGS += -DATHENA_HAS_BEARSSL=1
+  # Prefer vendored BearSSL sources if present; else link against libbearssl
+  ifneq (,$(wildcard $(EE_SRC_DIR)BearSSL/inc/bearssl.h))
+    EE_INCS += -I$(EE_SRC_DIR)BearSSL/inc
+    EE_LIBS += -Lee_modules/bearssl/lib -lbearssl
+    EXT_LIBS += ee_modules/bearssl/lib/libbearssl.a
+  else
+    EE_LIBS += -lbearssl
+  endif
 
   DYNAMIC_NETWORK = 0
 endif
@@ -194,11 +218,21 @@ ifeq ($(STATIC_CAMERA),1)
   DYNAMIC_CAMERA = 0
 endif
 
+# Native compiler (AOT JS to MIPS R5900)
+NATIVE_COMPILER ?= 1
+
+ifeq ($(NATIVE_COMPILER),1)
+  EE_CFLAGS += -DATHENA_NATIVE_COMPILER
+  EE_INCS += -Isrc/native_compiler
+  ATHENA_MODULES += ath_native.o
+  NATIVE_COMPILER_OBJS = native_compiler/native_compiler.o native_compiler/mips_emitter.o native_compiler/type_inference.o native_compiler/native_struct.o native_compiler/int64_runtime.o native_compiler/native_string.o native_compiler/native_array.o
+endif
+
 ATHENA_MODULES := $(ATHENA_MODULES:%=$(JS_API_DIR)%) #prepend the modules folder
 VU1_MPGS := $(VU1_MPGS:%=$(VU1_MPGS_DIR)%) #prepend the microprograms folder
 VU0_MPGS := $(VU0_MPGS:%=$(VU0_MPGS_DIR)%) #prepend the microprograms folder
 
-EE_OBJS = $(APP_CORE) $(INI_READER) $(JS_CORE) $(ATHENA_MODULES) $(VU1_MPGS) $(VU0_MPGS) $(IOP_MODULES) $(EMBEDDED_ELFS) $(EMBEDDED_ASSETS) # group them all
+EE_OBJS = $(APP_CORE) $(INI_READER) $(JS_CORE) $(ATHENA_MODULES) $(NATIVE_COMPILER_OBJS) $(VU1_MPGS) $(VU0_MPGS) $(IOP_MODULES) $(EMBEDDED_ELFS) $(EMBEDDED_ASSETS) # group them all
 EE_OBJS := $(EE_OBJS:%=$(EE_OBJ_DIR)%) #prepend the object folder
 
 EE_BIN := $(EE_BIN_DIR)$(EE_BIN_PREF)$(EE_EXT)
@@ -222,7 +256,7 @@ all: $(DIR_GUARD) $(EXT_LIBS) $(EE_OBJS)
 	
 	ps2-packer $(EE_BIN) $(EE_BIN_PKD) > /dev/null
 
- # vu1_mpgs: src/vu1/draw_3D_colors.vsm src/vu1/draw_3D_lights.vsm src/vu1/draw_3D_spec.vsm src/vu1/draw_3D_colors_skin.vsm src/vu1/draw_3D_lights_skin.vsm src/vu1/draw_3D_spec_skin.vsm src/vu1/draw_3D_lights_ref.vsm 
+ # vu1_mpgs: src/vu1/draw_2D_tile_list.vsm src/vu1/draw_3D_colors.vsm src/vu1/draw_3D_lights.vsm src/vu1/draw_3D_spec.vsm src/vu1/draw_3D_colors_skin.vsm src/vu1/draw_3D_lights_skin.vsm src/vu1/draw_3D_spec_skin.vsm src/vu1/draw_3D_lights_ref.vsm 
  # vu0_mpgs: src/vu0/matrix_multiply.vsm
 
 debug: $(DIR_GUARD) $(EXT_LIBS) $(EE_OBJS) 
@@ -245,6 +279,7 @@ clean:
 	$(MAKE) -C iop_modules/ds34bt clean
 	$(MAKE) -C ee_modules/loader clean
 	$(MAKE) -C ee_modules/ode clean
+	$(MAKE) -C ee_modules/bearssl clean
 
 	$(MAKE) -f Makefile.dl KEYBOARD=$(DYNAMIC_KEYBOARD) clean
 	$(MAKE) -f Makefile.dl MOUSE=$(DYNAMIC_MOUSE) clean
@@ -254,6 +289,10 @@ rebuild: clean all
 include $(PS2SDK)/samples/Makefile.pref
 include $(PS2SDK)/samples/Makefile.eeglobal
 include Makefile.embed
+
+# Build vendored BearSSL static library when present and TLS enabled
+ee_modules/bearssl/lib/libbearssl.a:
+	$(MAKE) -C ee_modules/bearssl
 
 $(EE_EMBED_DIR):
 	@mkdir -p $@
